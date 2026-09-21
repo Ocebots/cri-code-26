@@ -33,6 +33,7 @@ public class RobotContainer {
   private CommandXboxController operator = new CommandXboxController(2);
   private final SendableChooser<Command> autoChooser;
   public static boolean isExtended = false;
+  public static boolean intaking = false;
   private SwerveDrivetrain.SwerveDriveState driveState = drivetrain.getState();
 
   private Command shootGroup =
@@ -157,76 +158,41 @@ public class RobotContainer {
             controller::getRightX));
 
     /* Controls */
-    controller
-        .rightTrigger()
-        .toggleOnTrue(
-            new DrivetrainCommand(
-                drivetrain,
-                DrivetrainCommand.Position.AUTO_ALIGN_HUB,
-                controller::getLeftX,
-                controller::getLeftY,
-                controller::getRightX));
-    // Y = Shoot Toggle
-    controller
-        .y()
-        .toggleOnTrue(
-            (shootGroup
-                .alongWith(hopperShoot)
-                .alongWith(new IntakeCommand(intake, IntakeCommand.Position.SLOW_INTAKE))));
-    // X = Intake Toggle
-    controller
-        .x()
-        .and(() -> !shootGroup.isScheduled())
-        .toggleOnTrue(new IntakeCommand(intake, IntakeCommand.Position.INTAKE));
-    // Left Plus = Kicker Outtake Toggle
-    controller
-        .povLeft()
-        .and(() -> !shootGroup.isScheduled())
-        .toggleOnTrue(new KickerCommand(kicker, KickerCommand.Position.OUTTAKE));
-    // Right Plus = Intake Outtake Toggle
-    controller
-        .povRight()
-        .and(() -> !shootGroup.isScheduled())
-        .toggleOnTrue(new IntakeCommand(intake, IntakeCommand.Position.OUTTAKE));
-    // Right Stick Down = Retract Hopper
-    controller
-        .rightStick()
-        .and(() -> !shootGroup.isScheduled())
-        .onTrue(
-            Commands.run(() -> hopper.move(HopperConfig.HOPPER_RETRACT_ROTATION), hopper)
-                .withDeadline(Commands.waitSeconds(2)));
-    // Back button = Zero Pigeon
-    controller.back().onTrue(Commands.runOnce(drivetrain::zeroPigeon));
-    // Right Bumper = Flywheel Toggle for pass
-    controller
-        .rightBumper()
-        .toggleOnTrue(new FlywheelCommand(flywheel, FlywheelCommand.Position.PASS, drivetrain));
-    // Left Bumper = Flywheel Toggle for trench shot speeds
-    controller
-        .leftBumper()
-        .toggleOnTrue(
-            new FlywheelCommand(flywheel, FlywheelCommand.Position.TRENCH_SHOT, drivetrain));
-    // Left Trigger = Flywheel Toggle for calculated shot speeds
+    // Left Trigger = Flywheel On and Off
     controller
         .leftTrigger()
         .toggleOnTrue(
-            new FlywheelCommand(flywheel, FlywheelCommand.Position.CALCULATED_SHOT, drivetrain));
-    // Down Plus = Zero hopper
-    controller.povDown().onTrue(Commands.runOnce(() -> hopper.zero(), hopper));
-    // Intake Extend Shoot
+            new FlywheelCommand(flywheel, FlywheelCommand.Position.TRENCH_SHOT, drivetrain));
+    // Right Trigger = Shoot On and Off
     controller
-        .b()
-        .toggleOnTrue(
-            Commands.parallel(
-                new KickerCommand(kicker, KickerCommand.Position.INTAKE),
-                new IntakeCommand(intake, IntakeCommand.Position.SLOW_INTAKE),
-                Commands.run(() -> hopper.move(HopperConfig.HOPPER_EXTEND_ROTATION))));
-    // Hopper Extend
+        .rightTrigger()
+        .toggleOnTrue(new KickerCommand(kicker, KickerCommand.Position.INTAKE));
+
+    // Left Back Button = Shoot Reverse BACK LEFT MAPPED TO A
+    controller.a().onTrue(new KickerCommand(kicker, KickerCommand.Position.OUTTAKE));
+
+    // Left Bumper = Hopper deploy/stow toggle
     controller
-        .a()
+        .leftBumper()
         .onTrue(
-            Commands.run(() -> hopper.move(HopperConfig.HOPPER_EXTEND_ROTATION), hopper)
-                .withDeadline(Commands.waitSeconds(2)));
+            Commands.defer(
+                () ->
+                    new HopperCommand(
+                        hopper, HopperCommand.Position.EXTEND_RETRACT, RobotContainer.isExtended),
+                java.util.Set.of(hopper)));
+
+    // Left Bumper = Intake ON/OFF toggle
+    controller
+        .rightBumper()
+        .and(() -> !shootGroup.isScheduled())
+        .toggleOnTrue(new IntakeCommand(intake, IntakeCommand.Position.INTAKE));
+
+    // Right Bumper = Reverse intake, HELD, Back ight mapped to B
+    controller.b().whileTrue(new IntakeCommand(intake, IntakeCommand.Position.OUTTAKE));
+
+    // Back button = Zero Pigeon
+    controller.back().onTrue(Commands.runOnce(drivetrain::zeroPigeon));
+
     /* Operator */
     operator
         .leftBumper()
