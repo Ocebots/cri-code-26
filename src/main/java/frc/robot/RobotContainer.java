@@ -19,7 +19,6 @@ import frc.robot.commands.*;
 import frc.robot.config.HopperConfig;
 import frc.robot.config.IntakeConfig;
 import frc.robot.config.TunerConstants;
-import frc.robot.helpers.ShotCalculator;
 import frc.robot.subsystems.*;
 
 @Logged
@@ -166,7 +165,10 @@ public class RobotContainer {
     // Right Trigger = Shoot On and Off
     controller
         .rightTrigger()
-        .toggleOnTrue(new KickerCommand(kicker, KickerCommand.Position.INTAKE));
+        .toggleOnTrue(
+            (shootGroup
+                .alongWith(hopperShoot)
+                .alongWith(new IntakeCommand(intake, IntakeCommand.Position.SLOW_INTAKE))));
 
     // Left Back Button = Shoot Reverse BACK LEFT MAPPED TO A
     controller.a().onTrue(new KickerCommand(kicker, KickerCommand.Position.OUTTAKE));
@@ -181,33 +183,17 @@ public class RobotContainer {
                         hopper, HopperCommand.Position.EXTEND_RETRACT, RobotContainer.isExtended),
                 java.util.Set.of(hopper)));
 
-    // Left Bumper = Intake ON/OFF toggle
+    // Right Bumper = Intake ON/OFF toggle
     controller
         .rightBumper()
         .and(() -> !shootGroup.isScheduled())
         .toggleOnTrue(new IntakeCommand(intake, IntakeCommand.Position.INTAKE));
 
-    // Right Bumper = Reverse intake, HELD, Back ight mapped to B
+    // Right Bumper = Reverse intake, HELD, Back right mapped to B
     controller.b().whileTrue(new IntakeCommand(intake, IntakeCommand.Position.OUTTAKE));
 
     // Back button = Zero Pigeon
     controller.back().onTrue(Commands.runOnce(drivetrain::zeroPigeon));
-
-    /* Operator */
-    operator
-        .leftBumper()
-        .onTrue(
-            Commands.runOnce(
-                () -> drivetrain.setPose(ShotCalculator.calculateLeftCornerRobotPosition())));
-    operator
-        .rightBumper()
-        .onTrue(
-            Commands.runOnce(
-                () -> drivetrain.setPose(ShotCalculator.calculateRightCornerRobotPosition())));
-    operator
-        .y()
-        .onTrue(
-            Commands.runOnce(() -> drivetrain.setPose(ShotCalculator.calculateHubRobotPosition())));
   }
 
   public Command getAutonomousCommand() {
