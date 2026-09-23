@@ -19,7 +19,6 @@ import frc.robot.commands.*;
 import frc.robot.config.HopperConfig;
 import frc.robot.config.IntakeConfig;
 import frc.robot.config.TunerConstants;
-import frc.robot.helpers.ShotCalculator;
 import frc.robot.subsystems.*;
 
 @Logged
@@ -30,10 +29,8 @@ public class RobotContainer {
   private Intake intake = new Intake();
   private Kicker kicker = new Kicker();
   private CommandXboxController controller = new CommandXboxController(1);
-  private CommandXboxController operator = new CommandXboxController(2);
   private final SendableChooser<Command> autoChooser;
   public static boolean isExtended = false;
-  public static boolean intaking = false;
   private SwerveDrivetrain.SwerveDriveState driveState = drivetrain.getState();
 
   private Command shootGroup =
@@ -166,48 +163,51 @@ public class RobotContainer {
     // Right Trigger = Shoot On and Off
     controller
         .rightTrigger()
-        .toggleOnTrue(new KickerCommand(kicker, KickerCommand.Position.INTAKE));
+        .toggleOnTrue(
+            (shootGroup
+                .alongWith(hopperShoot)
+                .alongWith(new IntakeCommand(intake, IntakeCommand.Position.SLOW_INTAKE))));
 
-    // Left Back Button = Shoot Reverse BACK LEFT MAPPED TO A
-    controller.a().onTrue(new KickerCommand(kicker, KickerCommand.Position.OUTTAKE));
+    // Left Back Button = Shoot Reverse
+    controller.x().whileTrue(new KickerCommand(kicker, KickerCommand.Position.OUTTAKE));
 
     // Left Bumper = Hopper deploy/stow toggle
     controller
         .leftBumper()
         .onTrue(
-            Commands.defer(
-                () ->
-                    new HopperCommand(
-                        hopper, HopperCommand.Position.EXTEND_RETRACT, RobotContainer.isExtended),
-                java.util.Set.of(hopper)));
+            Commands.either(
+                // IF isExtended is TRUE: Flip state to false, then retract
+                Commands.runOnce(() -> isExtended = false)
+                    .andThen(
+                        Commands.runEnd(
+                                () -> hopper.move(HopperConfig.HOPPER_RETRACT_ROTATION),
+                                () -> hopper.stop(),
+                                hopper)
+                            .withDeadline(Commands.waitSeconds(.5))),
 
-    // Left Bumper = Intake ON/OFF toggle
+                // IF isExtended is FALSE: Flip state to true, then extend
+                Commands.runOnce(() -> isExtended = true)
+                    .andThen(
+                        Commands.runEnd(
+                                () -> hopper.move(HopperConfig.HOPPER_EXTEND_ROTATION),
+                                () -> hopper.stop(),
+                                hopper)
+                            .withDeadline(Commands.waitSeconds(.5))),
+
+                // Condition to check
+                () -> isExtended));
+
+    // Right Bumper = Intake ON/OFF toggle
     controller
         .rightBumper()
         .and(() -> !shootGroup.isScheduled())
         .toggleOnTrue(new IntakeCommand(intake, IntakeCommand.Position.INTAKE));
 
-    // Right Bumper = Reverse intake, HELD, Back ight mapped to B
-    controller.b().whileTrue(new IntakeCommand(intake, IntakeCommand.Position.OUTTAKE));
+    // Back Right = Reverse intake
+    controller.y().whileTrue(new IntakeCommand(intake, IntakeCommand.Position.OUTTAKE));
 
     // Back button = Zero Pigeon
     controller.back().onTrue(Commands.runOnce(drivetrain::zeroPigeon));
-
-    /* Operator */
-    operator
-        .leftBumper()
-        .onTrue(
-            Commands.runOnce(
-                () -> drivetrain.setPose(ShotCalculator.calculateLeftCornerRobotPosition())));
-    operator
-        .rightBumper()
-        .onTrue(
-            Commands.runOnce(
-                () -> drivetrain.setPose(ShotCalculator.calculateRightCornerRobotPosition())));
-    operator
-        .y()
-        .onTrue(
-            Commands.runOnce(() -> drivetrain.setPose(ShotCalculator.calculateHubRobotPosition())));
   }
 
   public Command getAutonomousCommand() {
