@@ -44,8 +44,8 @@ public class RobotContainer {
                                   () -> hopper.stop(),
                                   hopper)
                               .withDeadline(Commands.waitSeconds(2))));
-  private Command hopperShoot =
-      Commands.repeatingSequence(
+  private Command hopperShoot(){
+      return Commands.repeatingSequence(
           Commands.runEnd(
                   () -> hopper.slowMove(HopperConfig.HOPPER_RETRACT_ROTATION),
                   () -> hopper.stop(),
@@ -55,7 +55,7 @@ public class RobotContainer {
                   () -> hopper.slowMove(HopperConfig.HOPPER_EXTEND_ROTATION),
                   () -> hopper.stop(),
                   hopper)
-              .withDeadline(Commands.waitSeconds(.75)));
+              .withDeadline(Commands.waitSeconds(.75)));}
 
   public RobotContainer() {
 
@@ -74,18 +74,12 @@ public class RobotContainer {
 
     NamedCommands.registerCommand(
         "hopper retract",
-        Commands.repeatingSequence(
-                Commands.runEnd(
-                        () -> hopper.slowMove(HopperConfig.HOPPER_RETRACT_ROTATION),
-                        () -> hopper.stop(),
-                        hopper)
-                    .withDeadline(Commands.waitSeconds(.75)),
-                Commands.runEnd(
-                        () -> hopper.slowMove(HopperConfig.HOPPER_EXTEND_ROTATION),
-                        () -> hopper.stop(),
-                        hopper)
-                    .withDeadline(Commands.waitSeconds(.75)))
-            .withDeadline(Commands.waitSeconds(5)));
+        Commands.runEnd(
+                () -> hopper.move(HopperConfig.HOPPER_RETRACT_ROTATION),
+                () -> hopper.stop(),
+                hopper)
+            .alongWith(Commands.run(() -> System.out.println("Hopper Deployed")))
+            .withDeadline(Commands.waitSeconds(0.75)));
 
     NamedCommands.registerCommand(
         "intake",
@@ -94,7 +88,7 @@ public class RobotContainer {
 
     NamedCommands.registerCommand(
         "rev shooter",
-        new FlywheelCommand(flywheel, FlywheelCommand.Position.DEPOT_SHOT, drivetrain)
+        new FlywheelCommand(flywheel, FlywheelCommand.Position.TRENCH_SHOT, drivetrain)
             .withDeadline(Commands.waitSeconds(3)));
 
     NamedCommands.registerCommand(
@@ -102,7 +96,8 @@ public class RobotContainer {
         Commands.parallel(
                 new KickerCommand(kicker, KickerCommand.Position.INTAKE),
                 new IntakeCommand(intake, IntakeCommand.Position.SLOW_INTAKE),
-                new FlywheelCommand(flywheel, FlywheelCommand.Position.TRENCH_SHOT, drivetrain))
+                new FlywheelCommand(flywheel, FlywheelCommand.Position.TRENCH_SHOT, drivetrain),
+                hopperShoot())
             .withDeadline(Commands.waitSeconds(5)));
 
     NamedCommands.registerCommand(
@@ -165,7 +160,7 @@ public class RobotContainer {
         .rightTrigger()
         .toggleOnTrue(
             (shootGroup
-                .alongWith(hopperShoot)
+                .alongWith(hopperShoot())
                 .alongWith(new IntakeCommand(intake, IntakeCommand.Position.SLOW_INTAKE))));
 
     // Left Back Button = Shoot Reverse
@@ -208,6 +203,7 @@ public class RobotContainer {
 
     // Back button = Zero Pigeon
     controller.back().onTrue(Commands.runOnce(drivetrain::zeroPigeon));
+    controller.b().onTrue((Commands.runOnce(() -> hopper.zero())));
   }
 
   public Command getAutonomousCommand() {
