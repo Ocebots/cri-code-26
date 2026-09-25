@@ -4,7 +4,6 @@
 
 package frc.robot;
 
-import com.ctre.phoenix6.swerve.SwerveDrivetrain;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
 import com.pathplanner.lib.commands.FollowPathCommand;
@@ -28,34 +27,28 @@ public class RobotContainer {
   private Hopper hopper = new Hopper();
   private Intake intake = new Intake();
   private Kicker kicker = new Kicker();
-  private CommandXboxController controller = new CommandXboxController(1);
+  private CommandXboxController controller = new CommandXboxController(0);
   private final SendableChooser<Command> autoChooser;
   public static boolean isExtended = false;
-  private SwerveDrivetrain.SwerveDriveState driveState = drivetrain.getState();
 
   private Command shootGroup =
-      Commands.parallel(new KickerCommand(kicker, KickerCommand.Position.INTAKE))
-          .finallyDo(
-              interrupt ->
-                  CommandScheduler.getInstance()
-                      .schedule(
-                          Commands.runEnd(
-                                  () -> hopper.move(HopperConfig.HOPPER_EXTEND_ROTATION),
-                                  () -> hopper.stop(),
-                                  hopper)
-                              .withDeadline(Commands.waitSeconds(2))));
-  private Command hopperShoot(){
-      return Commands.repeatingSequence(
-          Commands.runEnd(
-                  () -> hopper.slowMove(HopperConfig.HOPPER_RETRACT_ROTATION),
-                  () -> hopper.stop(),
-                  hopper)
-              .withDeadline(Commands.waitSeconds(.75)),
-          Commands.runEnd(
-                  () -> hopper.slowMove(HopperConfig.HOPPER_EXTEND_ROTATION),
-                  () -> hopper.stop(),
-                  hopper)
-              .withDeadline(Commands.waitSeconds(.75)));}
+      Commands.parallel(
+          new KickerCommand(kicker, KickerCommand.Position.INTAKE),
+          new IntakeCommand(intake, IntakeCommand.Position.SLOW_INTAKE));
+
+  private Command hopperShoot() {
+    return Commands.repeatingSequence(
+        Commands.runEnd(
+                () -> hopper.slowMove(HopperConfig.HOPPER_RETRACT_ROTATION),
+                () -> hopper.stop(),
+                hopper)
+            .withDeadline(Commands.waitSeconds(.75)),
+        Commands.runEnd(
+                () -> hopper.slowMove(HopperConfig.HOPPER_EXTEND_ROTATION),
+                () -> hopper.stop(),
+                hopper)
+            .withDeadline(Commands.waitSeconds(.75)));
+  }
 
   public RobotContainer() {
 
@@ -159,9 +152,16 @@ public class RobotContainer {
     controller
         .rightTrigger()
         .toggleOnTrue(
-            (shootGroup
-                .alongWith(hopperShoot())
-                .alongWith(new IntakeCommand(intake, IntakeCommand.Position.SLOW_INTAKE))));
+            (shootGroup.alongWith(hopperShoot()))
+                .finallyDo(
+                    interrupt ->
+                        CommandScheduler.getInstance()
+                            .schedule(
+                                Commands.runEnd(
+                                        () -> hopper.move(HopperConfig.HOPPER_EXTEND_ROTATION),
+                                        () -> hopper.stop(),
+                                        hopper)
+                                    .withDeadline(Commands.waitSeconds(1)))));
 
     // Left Back Button = Shoot Reverse
     controller.x().whileTrue(new KickerCommand(kicker, KickerCommand.Position.OUTTAKE));
@@ -193,17 +193,16 @@ public class RobotContainer {
                 () -> isExtended));
 
     // Right Bumper = Intake ON/OFF toggle
-    controller
-        .rightBumper()
-        .and(() -> !shootGroup.isScheduled())
-        .toggleOnTrue(new IntakeCommand(intake, IntakeCommand.Position.INTAKE));
+    controller.rightBumper().toggleOnTrue(new IntakeCommand(intake, IntakeCommand.Position.INTAKE));
 
-    // Back Right = Reverse intake
+    // Back Right (y) = Reverse intake
     controller.y().whileTrue(new IntakeCommand(intake, IntakeCommand.Position.OUTTAKE));
 
     // Back button = Zero Pigeon
     controller.back().onTrue(Commands.runOnce(drivetrain::zeroPigeon));
-    controller.b().onTrue((Commands.runOnce(() -> hopper.zero())));
+
+    // B = Zero Hopper
+    controller.b().onTrue((Commands.runOnce(() -> hopper.zero(), hopper)));
   }
 
   public Command getAutonomousCommand() {
