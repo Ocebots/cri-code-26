@@ -68,8 +68,7 @@ public class RobotContainer {
     NamedCommands.registerCommand(
         "hopper retract",
         Commands.runEnd(
-                () -> hopper.move(HopperConfig.HOPPER_RETRACT_ROTATION),
-                () -> hopper.stop())
+                () -> hopper.move(HopperConfig.HOPPER_RETRACT_ROTATION), () -> hopper.stop())
             .alongWith(Commands.run(() -> System.out.println("Hopper Deployed")))
             .withDeadline(Commands.waitSeconds(0.75)));
 
